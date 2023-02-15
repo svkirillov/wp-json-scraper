@@ -24,6 +24,9 @@ from http.cookies import SimpleCookie
 import requests
 
 from lib.console import Console
+from lib.version import VERSION
+
+USER_AGENT = f"WPJsonScraper {VERSION}"
 
 class ConnectionCouldNotResolve(Exception):
     pass
@@ -74,6 +77,9 @@ class RequestSession:
         requests.auth.HTTPDigestAuth for NTLM-like authentication
         """
         self.s = requests.Session()
+
+        self.s.headers.update({"User-Agent": USER_AGENT})
+
         if proxy is not None:
             self.set_proxy(proxy)
         if cookies is not None:
@@ -153,7 +159,7 @@ class RequestSession:
             raise HTTPError
 
         return response
-    
+
     def set_cookies(self, cookies):
         """
         Sets new cookies from a string
@@ -162,19 +168,19 @@ class RequestSession:
         c.load(cookies)
         for key, m in c.items():
             self.s.cookies.set(key, m.value)
-    
+
     def get_cookies(self):
         return self.s.cookies.get_dict()
-    
+
     def set_proxy(self, proxy):
         prot = 'http'
         if proxy[:5].lower() == 'https':
             prot = 'https'
         self.s.proxies = {prot: proxy}
-    
+
     def get_proxies(self):
         return self.s.proxies
-    
+
     def set_creds(self, credentials):
         self.s.auth = credentials
 

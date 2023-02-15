@@ -35,8 +35,7 @@ from lib.exceptions import NoWordpressApi, WordPressApiNotV2, \
 from lib.exporter import Exporter
 from lib.requestsession import RequestSession
 from lib.interactive import start_interactive
-
-version = '0.5'
+from lib.version import VERSION
 
 def main():
     parser = argparse.ArgumentParser(description=
@@ -52,7 +51,7 @@ license, check LICENSE.txt for more information""")
     parser.add_argument('-v',
                         '--version',
                         action='version',
-                        version='%(prog)s ' + version)
+                        version='%(prog)s ' + VERSION)
     parser.add_argument('target',
                         type=str,
                         help='the base path of the WordPress installation to '
@@ -183,7 +182,7 @@ license, check LICENSE.txt for more information""")
 
     Target: %s
 
-    """ % (version, args.target)
+    """ % (VERSION, args.target)
 
     print(motd)
 
@@ -220,21 +219,21 @@ license, check LICENSE.txt for more information""")
     except Exception as e:
         Console.log_error("Failed to connect to the server")
         exit(0)
-    
-    # Quite an ugly check to launch a search on all parameters edible 
+
+    # Quite an ugly check to launch a search on all parameters edible
     # Should find something better (maybe in argparser doc?)
-    if args.search is not None and not (args.all | args.posts | args.pages | 
+    if args.search is not None and not (args.all | args.posts | args.pages |
         args.users | args.categories | args.tags | args.media):
         Console.log_info("Searching on all available sources")
         args.posts = True
-        args.pages = True 
+        args.pages = True
         args.users = True
         args.categories = True
         args.tags = True
         args.media = True
 
     if args.interactive:
-        start_interactive(target, session, version)
+        start_interactive(target, session, VERSION)
         return
 
     scanner = WPApi(target, session=session, search_terms=args.search)
@@ -247,7 +246,7 @@ license, check LICENSE.txt for more information""")
             Console.log_error("No WordPress API available at the given URL "
             "(too old WordPress or not WordPress?)")
             exit()
-    
+
     if args.posts or args.all:
         try:
             if args.comments:
@@ -359,7 +358,7 @@ license, check LICENSE.txt for more information""")
                 (page_number, args.page_export_folder))
         except WordPressApiNotV2:
             Console.log_error("The API does not support WP V2")
-    
+
     if args.comment_export_folder is not None:
         try:
             post_list = scanner.get_posts(True)
