@@ -213,6 +213,8 @@ license, check LICENSE.txt for more information""")
               ':'.join(authorization_list[1:]))
     session = RequestSession(proxy=proxy, cookies=cookies,
       authorization=authorization)
+    Exporter.create_session(proxy=proxy, cookies=cookies,
+      authorization=authorization)
     try:
         session.get(target)
         Console.log_success("Connection OK")

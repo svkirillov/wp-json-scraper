@@ -29,9 +29,12 @@ from datetime import datetime
 from urllib import parse as urlparse
 import mimetypes
 import requests
-
+from http.cookies import SimpleCookie
 from lib.console import Console
 from lib.utils import get_by_id, print_progress_bar
+from lib.requestsession import USER_AGENT
+
+session: requests.Session = None
 
 class Exporter:
     """
@@ -51,20 +54,53 @@ class Exporter:
     """
 
     @staticmethod
+    def create_session(proxy=None, cookies=None, authorization=None):
+        global session
+        session = requests.Session()
+        session.headers.update({"User-Agent": USER_AGENT})
+
+        if proxy is not None:
+            Exporter.set_proxy(proxy)
+        if cookies is not None:
+            Exporter.set_cookies(cookies)
+        if authorization is not None and (
+            type(authorization) is tuple and len(authorization) == 2 or
+            type(authorization) is requests.auth.HTTPBasicAuth or
+            type(authorization) is requests.auth.HTTPDigestAuth):
+            session.auth = authorization
+
+    @staticmethod
+    def set_cookies(cookies):
+        global session
+        c = SimpleCookie()
+        c.load(cookies)
+        for key, m in c.items():
+            session.cookies.set(key, m.value)
+
+    @staticmethod
+    def set_proxy(proxy):
+        global session
+        prot = 'http'
+        if proxy[:5].lower() == 'https':
+            prot = 'https'
+        session.proxies = {prot: proxy}
+
+    @staticmethod
     def download_media(media, output_folder, slugs=None):
         """
             Downloads the media files based on the given URLs
-            
+
             :param media: the URLs as a list
             :param output_folder: the path to the folder where the files are being saved, it is assumed as existing
             :param slugs: list of slugs to associate with media. The list must be ordered the same as media and should be the same size
             :return: the number of files wrote
         """
+        global session
         files_number = 0
         media_length = len(media)
         progress = 0
         for m in media:
-            r = requests.get(m, stream=True)
+            r = session.get(m, stream=True)
             if r.status_code == 200:
                 http_path = urlparse.urlparse(m).path.split("/")
                 local_path = output_folder
@@ -101,7 +137,7 @@ class Exporter:
         """
             Maps params to ids recursively.
 
-            This method automatically maps IDs with the correponding objects given in parameters_to_map. 
+            This method automatically maps IDs with the correponding objects given in parameters_to_map.
             The mapping is made in place as el is passed as a reference.
 
             :param el: the element that have ID references
@@ -133,7 +169,7 @@ class Exporter:
         """
             Sets up the right values for a list export.
 
-            This function flattens alist of objects before its serialization in the expected format. 
+            This function flattens alist of objects before its serialization in the expected format.
             It also makes a deepcopy to ensure that the original vlist is not altered.
 
             :param vlist: the list to prepare for exporting
@@ -234,7 +270,7 @@ class Exporter:
                         last_key = None
                         if type(k) is str:
                             last_key = k
-                            k = [k] 
+                            k = [k]
                         if k[0] in el.keys():
                             selected = el[k[0]]
                         else:
@@ -268,14 +304,14 @@ class Exporter:
             :param user_list: a list of users to associate them with author id
             :return: the length of the list written to the file
         """
-        exported_posts = Exporter.setup_export(posts, 
+        exported_posts = Exporter.setup_export(posts,
             [['title', 'rendered'], ['content', 'rendered'], ['excerpt', 'rendered']],
             {
                 'author': users_list,
                 'categories': categories_list,
                 'tags': tags_list,
             })
-        
+
         filename = Exporter.prepare_filename(filename, fmt)
         csv_keys = {
             'id': 'id',
@@ -308,7 +344,7 @@ class Exporter:
             {
                 'parent': category_list,
             })
-        
+
         filename = Exporter.prepare_filename(filename, fmt)
 
         csv_keys = {
@@ -323,7 +359,7 @@ class Exporter:
         }
         Exporter.write_file(filename, fmt, csv_keys, exported_categories, details)
         return len(exported_categories)
-    
+
     @staticmethod
     def export_tags(tags, fmt, filename):
         """
@@ -335,7 +371,7 @@ class Exporter:
             :return: the length of the list written to the file
         """
         filename = Exporter.prepare_filename(filename, fmt)
-        
+
         exported_tags = tags # It seems that no modification will be done for this one, so no deepcopy
         csv_keys = {
             'id': 'id',
@@ -357,12 +393,12 @@ class Exporter:
             :return: the length of the list written to the file
         """
         filename = Exporter.prepare_filename(filename, fmt)
-        
+
         exported_users = users # It seems that no modification will be done for this one, so no deepcopy
         csv_keys = {
             'id': 'id',
-            'name': 'name', 
-            'link': 'link', 
+            'name': 'name',
+            'link': 'link',
             'description': 'description'
         }
         Exporter.write_file(filename, fmt, csv_keys, exported_users)
@@ -372,7 +408,7 @@ class Exporter:
     def export_pages(pages, fmt, filename, parent_pages=None, users=None):
         """
             Exports pages in specified format to specified file.
-        
+
             :param pages: the pages to export
             :param fmt: the export format (JSON or CSV)
             :param filename: the path to the file to write
@@ -386,7 +422,7 @@ class Exporter:
                 'parent': parent_pages,
                 'author': users,
             })
-        
+
         filename = Exporter.prepare_filename(filename, fmt)
         csv_keys = {
             'id': 'id',
@@ -414,7 +450,7 @@ class Exporter:
             :param users: a list of users to associate them with author ids
             :return: the length of the list written to the file
         """
-        exported_media = Exporter.setup_export(media, 
+        exported_media = Exporter.setup_export(media,
             [
                 ['guid', 'rendered'],
                 ['title', 'rendered'],
@@ -424,7 +460,7 @@ class Exporter:
             {
                 'author': users,
             })
-        
+
         filename = Exporter.prepare_filename(filename, fmt)
         csv_keys = {
             'id': 'id',
@@ -473,7 +509,7 @@ class Exporter:
                 'post': parent_posts,
                 'author': users,
             })
-        
+
         # FIXME replacing the post ID by the post title in CSV mode doesn't work yet (nested keys)
         filename = Exporter.prepare_filename(filename, fmt)
         csv_keys = {
@@ -485,7 +521,7 @@ class Exporter:
             'author': 'author_name',
         }
         details = {
-            'post': ['title', 'rendered'] 
+            'post': ['title', 'rendered']
         }
         Exporter.write_file(filename, fmt, csv_keys, exported_comments, details)
         return len(exported_comments)
@@ -496,7 +532,7 @@ class Exporter:
     users_list=None):
         """
             Exports posts as HTML to specified export folder.
-        
+
             :param posts: the posts to export
             :param folder: the export folder
             :param tags_list: a list of tags to associate them with tag ids
@@ -692,7 +728,7 @@ class Exporter:
             exported_comments += 1
         return exported_comments
 
-    @staticmethod 
+    @staticmethod
     def export_comments_helper(comment, post, export_folder):
         date_format = "%Y-%m-%dT%H:%M:%S-%Z"
         if not os.path.isdir(export_folder):
